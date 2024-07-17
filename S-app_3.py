@@ -1,4 +1,3 @@
-#####Python 3.10.10
 import pandas as pd
 import os
 import time
@@ -10,23 +9,15 @@ import sys
 import pyperclip
 from fuzzywuzzy import fuzz
 import tkinter as tk
-from tkinter import END, messagebox, Button, Toplevel, Text, Frame, Label, Canvas, Scrollbar
+from tkinter import END, messagebox, Button, Toplevel, Text, Frame, Label, Canvas, Scrollbar,Frame
 from tkinter import font as tkfont
 import subprocess
 
-# Ensure stdout supports UTF-8 encoding
+
 sys.stdout.reconfigure(encoding='utf-8')
 
 def load_database(csv_file):
-    """
-    Load the CSV database.
-    
-    Parameters:
-    csv_file (str): Path to the CSV file
-    
-    Returns:
-    DataFrame: Loaded pandas DataFrame.
-    """
+ 
     if os.path.exists(csv_file):
         return pd.read_csv(csv_file, encoding='utf-8')
     else:
@@ -34,16 +25,7 @@ def load_database(csv_file):
         return pd.DataFrame(columns=columns)
 
 def generate_unique_key(authors, year):
-    """
-    Generate a unique key based on the first author's last name, year, and a random letter.
-    
-    Parameters:
-    authors (str): Comma-separated string of authors.
-    year (str/int): Year of publication.
-    
-    Returns:
-    str: Generated unique key.
-    """
+ 
     if not authors or not year:
         return "unknown"
     first_author_last_name = authors.split(",")[0].split(" ")[-1]
@@ -51,15 +33,7 @@ def generate_unique_key(authors, year):
     return f"{first_author_last_name}{year}{random_letter}"
 
 def extract_doi(pdf_path):
-    """
-    Extract DOI and additional information from a PDF file.
-    
-    Parameters:
-    pdf_path (str): Path to the PDF file.
-    
-    Returns:
-    tuple: Extracted DOI, title, authors, year, volume, pages, number, journal, publisher, and BibTeX information.
-    """
+ 
     try:
         result = pdf2doi.pdf2doi(pdf_path)
         doi = result['identifier']
@@ -93,16 +67,7 @@ def extract_doi(pdf_path):
         return None, None, None, None, None, None, None, None, None, None
 
 def scan_directory(directory, existing_files_info):
-    """
-    Scan a directory to collect PDF file information and extract DOI details.
-    
-    Parameters:
-    directory (str): Directory to scan.
-    existing_files_info (dict): Dictionary of existing file paths to their sizes and modified times.
-    
-    Returns:
-    tuple: Lists of new file data, updated file data, and counts of new and updated files.
-    """
+ 
     new_data = []
     updated_data = []
     new_files_found = 0
@@ -128,16 +93,7 @@ def scan_directory(directory, existing_files_info):
     return new_data, updated_data, new_files_found, updated_files_found
 
 def check_database_validity(directory, csv_file):
-    """
-    Check and update the file database for a directory.
-    
-    Parameters:
-    directory (str): Directory to scan.
-    csv_file (str): Path to the CSV file containing the database.
-    
-    Returns:
-    DataFrame: Updated DataFrame after scanning the directory and updating the database.
-    """
+  
     df = load_database(csv_file)
     existing_files_info = {
         row['Path']: {'size': row['Size'], 'modified_date': row['Modified Date']}
@@ -155,12 +111,16 @@ def check_database_validity(directory, csv_file):
         new_df = pd.DataFrame(new_data, columns=['Path', 'Name', 'Extension', 'Size', 'Modified Date', 'DOI', 'Year', 'Author', 'Title', 'Volume', 'Pages', 'Number', 'Journal', 'Publisher', 'BibTeX', 'Comments'])
         df = pd.concat([df, new_df], ignore_index=True)
         messages.append(f"Database has been updated with {new_files_found} new file(s).")
+    else:
+        messages.append(f"Database has been updated with 0 new file(s).")
     
     if updated_files_found > 0:
         for updated_row in updated_data:
             full_path = updated_row[0]
             df.loc[df['Path'] == full_path, ['Size', 'Modified Date']] = updated_row[3:5]
         messages.append(f"Database has been updated with {updated_files_found} modified file(s).")
+    else:
+        messages.append(f"Database has been updated with 0 modified file(s).")
     
     df.to_csv(csv_file, index=False, encoding='utf-8')
     messages.append(f"Database has been cleaned by removing {len(missing_files)} missing file(s).")
@@ -169,15 +129,7 @@ def check_database_validity(directory, csv_file):
     return df
 
 def confirm_deletion(item):
-    """
-    Create a confirmation window to ask the user whether to delete the given file.
-    
-    Parameters:
-    item (Series): The row of the DataFrame corresponding to the duplicate file.
-    
-    Returns:
-    bool: True if the user confirms deletion, False otherwise.
-    """
+ 
     confirmed = []
 
     def on_yes():
@@ -190,27 +142,29 @@ def confirm_deletion(item):
 
     confirmation_window = Toplevel()
     confirmation_window.title("Confirm Deletion")
-    confirmation_window.geometry("800x200")
+    confirmation_window.geometry("400x300")
 
-    Label(confirmation_window, text=f"Found duplicate:\nName: {item['Name']}\nTitle: {item['Title']}\nPath: {item['Path']}").pack(pady=10)
-    Button(confirmation_window, text="Yes", command=on_yes, width=10).pack(side="left", padx=20, pady=20)
-    Button(confirmation_window, text="No", command=on_no, width=10).pack(side="right", padx=20, pady=20)
+    frame = Frame(confirmation_window)
+    frame.pack(pady=10, padx=10, fill="both", expand=True)
+    
+    details = f"Found duplicate:\nName: {item['Name']}\nTitle: {item['Title']}\nPath: {item['Path']}"
+    details_label = Label(frame, text=details, wraplength=380, justify="left")
+    details_label.pack(pady=10)
+
+    button_frame = Frame(confirmation_window)
+    button_frame.pack(pady=20)
+    
+    Button(button_frame, text="Yes", command=on_yes, width=10).pack(side="left", padx=20)
+    Button(button_frame, text="No", command=on_no, width=10).pack(side="right", padx=20)
 
     confirmation_window.grab_set()
     confirmation_window.wait_window()
 
     return confirmed[0]
 
+
 def confirm_extraction(name):
-    """
-    Create a confirmation window to ask the user whether to extract DOI for the given file.
-    
-    Parameters:
-    name (str): Name of the PDF file.
-    
-    Returns:
-    bool: True if the user confirms extraction, False otherwise.
-    """
+ 
     confirmed = []
 
     def on_yes():
@@ -223,11 +177,19 @@ def confirm_extraction(name):
 
     confirmation_window = Toplevel()
     confirmation_window.title("Confirm Extraction")
-    confirmation_window.geometry("800x200")
+    confirmation_window.geometry("400x200")
 
-    Label(confirmation_window, text=f"Do you want to extract DOI for '{name}'?").pack(pady=10)
-    Button(confirmation_window, text="Yes", command=on_yes, width=10).pack(side="left", padx=20, pady=20)
-    Button(confirmation_window, text="No", command=on_no, width=10).pack(side="right", padx=20, pady=20)
+    frame = Frame(confirmation_window)
+    frame.pack(pady=10, padx=10, fill="both", expand=True)
+    
+    name_label = Label(frame, text=f"Do you want to extract DOI for '{name}'?", wraplength=380, justify="left")
+    name_label.pack(pady=10)
+
+    button_frame = Frame(confirmation_window)
+    button_frame.pack(pady=20)
+    
+    Button(button_frame, text="Yes", command=on_yes, width=10).pack(side="left", padx=20)
+    Button(button_frame, text="No", command=on_no, width=10).pack(side="right", padx=20)
 
     confirmation_window.grab_set()
     confirmation_window.wait_window()
@@ -235,13 +197,7 @@ def confirm_extraction(name):
     return confirmed[0]
 
 def remove_duplicates(df, csv_file):
-    """
-    Remove duplicate entries based on the "DOI" column and delete corresponding PDF files.
-    
-    Parameters:
-    df (DataFrame): DataFrame containing the database.
-    csv_file (str): Path to the CSV file.
-    """
+ 
     # Separate rows with and without DOI
     df_with_doi = df[df['DOI'].notna() & df['DOI'].str.strip().astype(bool)]
     df_without_doi = df[~df.index.isin(df_with_doi.index)]
@@ -249,9 +205,6 @@ def remove_duplicates(df, csv_file):
     # Find duplicates within rows that have DOI
     duplicates = df_with_doi[df_with_doi.duplicated(subset='DOI', keep=False)]
     
-    #if duplicates.empty:
-    #    messagebox.showinfo("Duplicates Check", "No duplicates found.")
-    #    return
     
     # Group duplicates by DOI
     grouped_duplicates = duplicates.groupby('DOI')
@@ -275,21 +228,11 @@ def remove_duplicates(df, csv_file):
     updated_df.to_csv(csv_file, index=False, encoding='utf-8')
     
     deleted_files = []
-    not_found_files = []
+    #not_found_files = []
     for file_path in files_to_delete:
         if os.path.exists(file_path):
             os.remove(file_path)
             deleted_files.append(file_path)
-        else:
-            not_found_files.append(file_path)
-
-    messages = [f"Removed {len(indices_to_delete)} duplicate file(s) from the database."]
-    if deleted_files:
-        messages.append(f"Deleted files:\n" + "\n".join(deleted_files))
-    if not_found_files:
-        messages.append(f"Files not found:\n" + "\n".join(not_found_files))
-
-    messagebox.showinfo("Duplicates Removal", "\n".join(messages))
 
 class PDFSearchApp:
     def __init__(self, root):
@@ -304,9 +247,13 @@ class PDFSearchApp:
         
         self.title_font = tkfont.Font(family="Helvetica", size=11, weight="bold")
         
-           # Frame for directory and update
+           # Frame for directory and update        
         dir_update_frame = Frame(root)
         dir_update_frame.pack(pady=10)
+        
+        # Running message label
+        self.running_label = tk.Label(root, text="", font=self.custom_font, fg="red")
+        self.running_label.pack(pady=10)
 
         tk.Label(dir_update_frame, text="Set Directory to Scan:", font=self.custom_font).pack()
         self.entry_directory = tk.Entry(dir_update_frame, font=self.custom_font)
@@ -332,6 +279,8 @@ class PDFSearchApp:
 
         search_button = tk.Button(search_frame, text="Search", command=self.search, font=self.custom_font)
         search_button.pack()
+        
+        self.root.bind('<Return>', lambda event: self.search())
 
         self.results_container = Frame(root)
         self.results_container.pack(fill=tk.BOTH, expand=True)
@@ -368,9 +317,7 @@ class PDFSearchApp:
         columns_to_search = ['Path', 'Name', 'DOI', 'Year', 'Author', 'Title', 'Journal', 'Publisher', 'Comments']
 
         missing_columns = [col for col in columns_to_search if col not in df.columns]
-        #if missing_columns:
-        #    print(f"Warning: Missing columns in the DataFrame: {missing_columns}")
-        #    return pd.DataFrame()
+)
 
         def match_row(row, keywords):
             row_str = ' '.join(str(row[col]) for col in columns_to_search if col in row).lower()
@@ -398,7 +345,6 @@ class PDFSearchApp:
         bib_info = self.results.iloc[index]['BibTeX']
         if pd.notna(bib_info):
             pyperclip.copy(bib_info)
-            #messagebox.showinfo("Success", "BibTeX info copied to clipboard.")
         else:
             messagebox.showerror("Error", "BibTeX info not available for this entry.")
 
@@ -473,8 +419,17 @@ class PDFSearchApp:
             Button(frame_buttons, text="Copy BibTeX", command=lambda i=index: self.copy_bibtex(i), font=self.custom_font).pack(side="left", padx=(0, 10))
             Button(frame_buttons, text="Edit Comments", command=lambda i=index: self.open_comments_window(i), font=self.custom_font).pack(side="left", padx=(0, 10))
 
+    def show_running_message(self):
+        self.running_label.config(text="Running...")
+        self.root.update_idletasks()
+
+    def hide_running_message(self):
+        self.running_label.config(text="")
+        self.root.update_idletasks()
+
     def update_database(self):
         try:
+            self.show_running_message()
             directory_to_scan = self.entry_directory.get()
             if not directory_to_scan:
                 messagebox.showerror("Error", "Please set a directory to scan first.")
@@ -482,9 +437,10 @@ class PDFSearchApp:
             df = check_database_validity(directory_to_scan, 'file_database.csv')
             remove_duplicates(df, 'file_database.csv')
             self.df = load_database('file_database.csv')
-            messagebox.showinfo("Success", "Database updated successfully.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to update database: {e}")
+        finally:
+            self.hide_running_message()
 
 
 if __name__ == "__main__":
