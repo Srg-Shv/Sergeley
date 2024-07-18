@@ -1,3 +1,4 @@
+#####Python 3.10.10
 import pandas as pd
 import os
 import time
@@ -13,11 +14,19 @@ from tkinter import END, messagebox, Button, Toplevel, Text, Frame, Label, Canva
 from tkinter import font as tkfont
 import subprocess
 
-
+# Ensure stdout supports UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
 
 def load_database(csv_file):
- 
+    """
+    Load the CSV database.
+    
+    Parameters:
+    csv_file (str): Path to the CSV file
+    
+    Returns:
+    DataFrame: Loaded pandas DataFrame.
+    """
     if os.path.exists(csv_file):
         return pd.read_csv(csv_file, encoding='utf-8')
     else:
@@ -25,7 +34,16 @@ def load_database(csv_file):
         return pd.DataFrame(columns=columns)
 
 def generate_unique_key(authors, year):
- 
+    """
+    Generate a unique key based on the first author's last name, year, and a random letter.
+    
+    Parameters:
+    authors (str): Comma-separated string of authors.
+    year (str/int): Year of publication.
+    
+    Returns:
+    str: Generated unique key.
+    """
     if not authors or not year:
         return "unknown"
     first_author_last_name = authors.split(",")[0].split(" ")[-1]
@@ -33,7 +51,15 @@ def generate_unique_key(authors, year):
     return f"{first_author_last_name}{year}{random_letter}"
 
 def extract_doi(pdf_path):
- 
+    """
+    Extract DOI and additional information from a PDF file.
+    
+    Parameters:
+    pdf_path (str): Path to the PDF file.
+    
+    Returns:
+    tuple: Extracted DOI, title, authors, year, volume, pages, number, journal, publisher, and BibTeX information.
+    """
     try:
         result = pdf2doi.pdf2doi(pdf_path)
         doi = result['identifier']
@@ -67,7 +93,21 @@ def extract_doi(pdf_path):
         return None, None, None, None, None, None, None, None, None, None
 
 def scan_directory(directory, existing_files_info):
- 
+    """
+    Scan a directory to collect PDF file information and extract DOI details.
+    
+    Parameters:
+    directory (str): Directory to scan.
+    existing_files_info (dict): Dictionary of existing file paths to their sizes and modified times.
+    
+    Returns:
+    tuple: Lists of new file data, updated file data, and counts of new and updated files.
+    """
+    # Check if the directory exists¶
+    if not os.path.exists(directory):
+        messagebox.showerror("Error", f"The directory '{directory}' does not exist.")
+        return
+
     new_data = []
     updated_data = []
     new_files_found = 0
@@ -93,7 +133,16 @@ def scan_directory(directory, existing_files_info):
     return new_data, updated_data, new_files_found, updated_files_found
 
 def check_database_validity(directory, csv_file):
-  
+    """
+    Check and update the file database for a directory.
+    
+    Parameters:
+    directory (str): Directory to scan.
+    csv_file (str): Path to the CSV file containing the database.
+    
+    Returns:
+    DataFrame: Updated DataFrame after scanning the directory and updating the database.
+    """
     df = load_database(csv_file)
     existing_files_info = {
         row['Path']: {'size': row['Size'], 'modified_date': row['Modified Date']}
@@ -129,7 +178,15 @@ def check_database_validity(directory, csv_file):
     return df
 
 def confirm_deletion(item):
- 
+    """
+    Create a confirmation window to ask the user whether to delete the given file.
+    
+    Parameters:
+    item (Series): The row of the DataFrame corresponding to the duplicate file.
+    
+    Returns:
+    bool: True if the user confirms deletion, False otherwise.
+    """
     confirmed = []
 
     def on_yes():
@@ -164,7 +221,15 @@ def confirm_deletion(item):
 
 
 def confirm_extraction(name):
- 
+    """
+    Create a confirmation window to ask the user whether to extract DOI for the given file.
+    
+    Parameters:
+    name (str): Name of the PDF file.
+    
+    Returns:
+    bool: True if the user confirms extraction, False otherwise.
+    """
     confirmed = []
 
     def on_yes():
@@ -197,7 +262,13 @@ def confirm_extraction(name):
     return confirmed[0]
 
 def remove_duplicates(df, csv_file):
- 
+    """
+    Remove duplicate entries based on the "DOI" column and delete corresponding PDF files.
+    
+    Parameters:
+    df (DataFrame): DataFrame containing the database.
+    csv_file (str): Path to the CSV file.
+    """
     # Separate rows with and without DOI
     df_with_doi = df[df['DOI'].notna() & df['DOI'].str.strip().astype(bool)]
     df_without_doi = df[~df.index.isin(df_with_doi.index)]
@@ -205,6 +276,9 @@ def remove_duplicates(df, csv_file):
     # Find duplicates within rows that have DOI
     duplicates = df_with_doi[df_with_doi.duplicated(subset='DOI', keep=False)]
     
+    #if duplicates.empty:
+    #    messagebox.showinfo("Duplicates Check", "No duplicates found.")
+    #    return
     
     # Group duplicates by DOI
     grouped_duplicates = duplicates.groupby('DOI')
@@ -233,6 +307,17 @@ def remove_duplicates(df, csv_file):
         if os.path.exists(file_path):
             os.remove(file_path)
             deleted_files.append(file_path)
+        #else:
+         #   not_found_files.append(file_path)
+
+    #messages = [f"Removed {len(indices_to_delete)} duplicate file(s) from the database."]
+    
+    #if deleted_files:
+    #    messages.append(f"Deleted files:\n" + "\n".join(deleted_files))
+    #if not_found_files:
+    #    messages.append(f"Files not found:\n" + "\n".join(not_found_files))
+    
+    #messagebox.showinfo("Duplicates Removal", "\n".join(messages))
 
 class PDFSearchApp:
     def __init__(self, root):
@@ -317,7 +402,9 @@ class PDFSearchApp:
         columns_to_search = ['Path', 'Name', 'DOI', 'Year', 'Author', 'Title', 'Journal', 'Publisher', 'Comments']
 
         missing_columns = [col for col in columns_to_search if col not in df.columns]
-)
+        #if missing_columns:
+        #    print(f"Warning: Missing columns in the DataFrame: {missing_columns}")
+        #    return pd.DataFrame()
 
         def match_row(row, keywords):
             row_str = ' '.join(str(row[col]) for col in columns_to_search if col in row).lower()
@@ -345,6 +432,7 @@ class PDFSearchApp:
         bib_info = self.results.iloc[index]['BibTeX']
         if pd.notna(bib_info):
             pyperclip.copy(bib_info)
+            #messagebox.showinfo("Success", "BibTeX info copied to clipboard.")
         else:
             messagebox.showerror("Error", "BibTeX info not available for this entry.")
 
@@ -437,6 +525,7 @@ class PDFSearchApp:
             df = check_database_validity(directory_to_scan, 'file_database.csv')
             remove_duplicates(df, 'file_database.csv')
             self.df = load_database('file_database.csv')
+            #messagebox.showinfo("Success", "Database updated successfully.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to update database: {e}")
         finally:
