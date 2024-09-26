@@ -40,7 +40,7 @@ This Python program is a PDF management and search tool tailored for organizing 
 2. **Create a `default_directory.txt` File:**
 
    - In the same directory as your script, create a text file named `default_directory.txt`.
-   - In this file, enter the full path to the directory where your PDF files are stored (e.g., `F:\_Papers\2024`).
+   - In this file, enter the full path to the directory where your PDF files are stored (e.g., `F:\_Papers`).
    - This file allows you to easily change the default scanning directory without modifying the script.
 
 3. **Run the Program:**
