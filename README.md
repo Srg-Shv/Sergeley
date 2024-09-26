@@ -12,6 +12,7 @@ This Python program is a PDF management and search tool tailored for organizing 
 - **Manage duplicates** based on DOI to keep your collection clean.
 - **View recent papers** added or modified in the last 4 weeks.
 - **Tag papers** using comments and search papers by tags.
+- **External Configuration**: The default directory for scanning is specified in an external `default_directory.txt` file for easy customization.
 
 ---
 
@@ -36,7 +37,13 @@ This Python program is a PDF management and search tool tailored for organizing 
 
    - Copy the provided Python code into a file named `pdf_search_app.py`.
 
-2. **Run the Program:**
+2. **Create a `default_directory.txt` File:**
+
+   - In the same directory as your script, create a text file named `default_directory.txt`.
+   - In this file, enter the full path to the directory where your PDF files are stored (e.g., `F:\_Papers\2024`).
+   - This file allows you to easily change the default scanning directory without modifying the script.
+
+3. **Run the Program:**
 
    - Open a terminal or command prompt.
    - Navigate to the directory where you saved `pdf_search_app.py`.
@@ -46,14 +53,13 @@ This Python program is a PDF management and search tool tailored for organizing 
      python pdf_search_app.py
      ```
 
-3. **Set the Directory to Scan:**
+4. **Set the Directory to Scan:**
 
-   - In the GUI window that appears, locate the entry field labeled **"Set Directory to Scan:"**.
-   - Enter the full path to the directory where your PDF files are stored.
-     - Example: `F:\_Papers\2024` or `/Users/yourname/Documents/Papers`.
-   - This directory (and its subdirectories) will be scanned for PDF files.
+   - In the GUI window that appears, the entry field labeled **"Set Directory to Scan:"** will be pre-filled with the path from the `default_directory.txt` file.
+   - You can modify this path manually in the GUI if needed.
+   - The directory (and its subdirectories) will be scanned for PDF files.
 
-4. **Update the Database:**
+5. **Update the Database:**
 
    - Click the **"Update Database"** button.
    - The program will scan the specified directory for PDF files.
@@ -62,7 +68,7 @@ This Python program is a PDF management and search tool tailored for organizing 
      - Click **"No"** to skip extraction (you can add/edit BibTeX information later).
    - If duplicates are detected based on DOI, you will be prompted to confirm deletion.
 
-5. **Search for Papers:**
+6. **Search for Papers:**
 
    - In the **"Enter search keywords:"** field, input keywords related to the papers you're searching for.
      - Separate multiple keywords with spaces.
@@ -71,7 +77,7 @@ This Python program is a PDF management and search tool tailored for organizing 
    - Click the **"Search"** button or press **Enter**.
    - Matching results will be displayed below.
 
-6. **Interact with Search Results:**
+7. **Interact with Search Results:**
 
    - Each search result will display the paper's title, author, and year (if available).
    - Available actions for each paper:
@@ -80,11 +86,11 @@ This Python program is a PDF management and search tool tailored for organizing 
      - **Edit BibTeX**: Allows you to view and edit the BibTeX information.
      - **Edit Comments**: Add or modify comments and tags for the paper.
 
-7. **View Recent Papers:**
+8. **View Recent Papers:**
 
    - Click the **"Show Recent Papers"** button to display papers added or modified in the last 4 weeks.
 
-8. **Tagging and Searching by Tags:**
+9. **Tagging and Searching by Tags:**
 
    - **Adding Tags**:
      - When editing comments for a paper, you can add tags by enclosing them in curly braces `{}`.
@@ -94,12 +100,14 @@ This Python program is a PDF management and search tool tailored for organizing 
    - **Searching by Tag**:
      - In the tags list, double-click a tag to display all papers associated with it.
 
-9. **Remove Duplicates:**
+10. **Remove Duplicates:**
 
    - The program checks for duplicate PDFs based on DOI during database updates.
-   - If duplicates are found, you'll be asked whether to delete the duplicate files.
+   - If
 
-10. **Edit BibTeX and Comments:**
+duplicates are found, you'll be asked whether to delete the duplicate files.
+
+11. **Edit BibTeX and Comments:**
 
     - **Edit BibTeX**:
       - Allows you to correct or update the BibTeX entry for accurate citations.
