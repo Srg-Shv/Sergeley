@@ -276,7 +276,7 @@ def remove_duplicates(df, csv_file):
                 files_to_delete.append(item['Path'])
                 indices_to_delete.append(item.name)
     
-    df_with_doi.drop(index=indices_to_delete, inplace=True)
+    df_with_doi = df_with_doi.drop(index=indices_to_delete)
     
     # Drop the 'DOI_extracted' column
     df_with_doi = df_with_doi.drop(columns=['DOI_extracted'])
@@ -603,7 +603,7 @@ class PDFSearchApp:
             
     def show_recent_papers(self):
         today = datetime.datetime.now()
-        four_weeks_ago = today - datetime.timedelta(weeks=4)
+        four_weeks_ago = today - datetime.timedelta(days=7)#(weeks=4)
         
         if 'Modified Date' in self.df.columns:
             # Parse 'Modified Date' strings to datetime objects
