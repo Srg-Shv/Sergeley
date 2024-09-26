@@ -1,19 +1,20 @@
-import pandas as pd
-import os
-import time
-import random
-import string
-import json
-import pdf2doi
 import sys
-import pyperclip
+import pandas as pd
+from os import path, walk, startfile, remove, makedirs
+from time import ctime
+from random import choice
+from string import ascii_lowercase
+from json import loads
+from pdf2doi import pdf2doi
+from pyperclip import copy
 from fuzzywuzzy import fuzz
 import tkinter as tk
 from tkinter import END, DISABLED, messagebox, Button, Toplevel, Text, Frame, Label, Canvas, Scrollbar
 from tkinter import font as tkfont
-import subprocess
-import datetime
-from dateutil import parser
+from subprocess import call
+from datetime import datetime, timedelta
+from dateutil.parser import parse
+
 
 # Ensure stdout supports UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
@@ -314,6 +315,22 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 # ... [Assuming other functions like load_database, parse_bibtex_field, etc., remain unchanged] ...
 
+def load_default_directory():
+    """
+    Load the default directory from a text file.
+    """
+    default_dir_file = 'default_directory.txt'
+
+    # Check if the text file exists
+    if os.path.exists(default_dir_file):
+        # Read the directory from the file
+        with open(default_dir_file, 'r') as file:
+            directory = file.readline().strip()
+            return directory
+    else:
+        # If the file does not exist, return an empty string or some default path
+        return ""
+
 class PDFSearchApp:
     def __init__(self, root):
         self.root = root
@@ -337,7 +354,10 @@ class PDFSearchApp:
         tk.Label(dir_update_frame, text="Set Directory to Scan:", font=self.custom_font).pack()
         self.entry_directory = tk.Entry(dir_update_frame, font=self.custom_font)
         self.entry_directory.pack()
-        self.entry_directory.insert(0, 'F:\\_Papers\\2024')
+
+        # Load the default directory from the text file
+        default_directory = load_default_directory()
+        self.entry_directory.insert(0, default_directory if default_directory else 'F:\\_Papers\\2024')
 
         update_button = tk.Button(dir_update_frame, text="Update Database", command=self.update_database, font=self.custom_font)
         update_button.pack()
