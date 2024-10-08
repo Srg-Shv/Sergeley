@@ -238,7 +238,7 @@ class PDFSearchApp:
     def __init__(self, root):
         self.root = root
         self.root.title("PDF Search")
-        self.root.geometry("1200x800")
+        self.root.geometry("1150x800")
 
         self.df = load_database('file_database.csv')
         self.results = pd.DataFrame()
@@ -263,12 +263,20 @@ class PDFSearchApp:
         search_frame = Frame(root)
         search_frame.pack(pady=10)
 
-        # Adding back the Tags button
-        tag_button = tk.Button(search_frame, text="Show {Tags}", command=self.show_tags, font=self.custom_font)
-        tag_button.pack()
+        # Create a new frame within search_frame to hold the buttons
+        button_frame = Frame(search_frame)
+        button_frame.pack()
 
-        recent_button = tk.Button(search_frame, text="Show Recent Papers", command=self.show_recent_papers, font=self.custom_font)
-        recent_button.pack()
+        # Adding back the Tags button
+        tag_button = tk.Button(button_frame, text="Show {Tags}", command=self.show_tags, font=self.custom_font)
+        tag_button.pack(side=tk.LEFT, padx=5)
+
+        recent_button = tk.Button(button_frame, text="Show Recent Papers", command=self.show_recent_papers, font=self.custom_font)
+        recent_button.pack(side=tk.LEFT, padx=5)
+
+        very_recent_button = tk.Button(button_frame, text="Show just added papers", command=self.show_very_recent_papers, font=self.custom_font)
+        very_recent_button.pack(side=tk.LEFT, padx=5)
+
 
         tk.Label(search_frame, text="Enter search keywords:", font=self.custom_font).pack()
         self.entry_keywords = tk.Entry(search_frame, font=self.custom_font)
@@ -318,7 +326,7 @@ class PDFSearchApp:
         # Create a new window to show tags
         tags_window = Toplevel(self.root)
         tags_window.title("Tags")
-        tags_window.geometry("200x400")
+        tags_window.geometry("200x600")
 
         # Create a Listbox to show tags
         listbox = Listbox(tags_window, font=self.custom_font)
@@ -565,7 +573,7 @@ class PDFSearchApp:
 
     def show_recent_papers(self):
         today = datetime.now()
-        four_weeks_ago = today - timedelta(hours=24)#(weeks=4)
+        four_weeks_ago = today - timedelta(weeks=4)#(weeks=4)
 
         if 'Modified Date' in self.df.columns:
             def parse_date(date_str):
@@ -585,6 +593,34 @@ class PDFSearchApp:
 
             if recent_papers.empty:
                 messagebox.showinfo("No Recent Papers", "No papers added or modified in the last 4 weeks.")
+            else:
+                self.results = recent_papers.reset_index(drop=True)
+                self.display_results()
+        else:
+            messagebox.showinfo("Error", "'Modified Date' column not found in the database.")
+            
+    def show_very_recent_papers(self):
+        today = datetime.now()
+        four_weeks_ago = today - timedelta(hours=6)#(weeks=4)
+
+        if 'Modified Date' in self.df.columns:
+            def parse_date(date_str):
+                try:
+                    return parse(date_str)
+                except (ValueError, TypeError):
+                    return pd.NaT
+
+            self.df['Parsed Modified Date'] = self.df['Modified Date'].apply(parse_date)
+
+            recent_papers = self.df[
+                self.df['Parsed Modified Date'].notna() &
+                (self.df['Parsed Modified Date'] >= four_weeks_ago)
+            ]
+
+            recent_papers = recent_papers.sort_values(by='Parsed Modified Date', ascending=False)
+
+            if recent_papers.empty:
+                messagebox.showinfo("No Just Added Papers", "No papers added or modified in the last 6 hours.")
             else:
                 self.results = recent_papers.reset_index(drop=True)
                 self.display_results()
