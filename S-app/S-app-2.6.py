@@ -24,6 +24,22 @@ import shutil
 # Ensure stdout supports UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
 
+def load_default_directory():
+    """
+    Load the default directory from a text file.
+    """
+    default_dir_file = 'default_directory.txt'
+
+    # Check if the text file exists
+    if os.path.exists(default_dir_file):
+        # Read the directory from the file
+        with open(default_dir_file, 'r') as file:
+            directory = file.readline().strip()
+            return directory
+    else:
+        # If the file does not exist, return an empty string or some default path
+        return ""
+
 def load_database(csv_file):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(script_dir, csv_file)
@@ -244,17 +260,21 @@ class PDFSearchApp:
         self.custom_font = tkfont.Font(family="Helvetica", size=11)
         self.title_font = tkfont.Font(family="Helvetica", size=11, weight="bold")
         self.title_path = tkfont.Font(family="Arial", size=8)#, weight="bold")
+        
+
 
         dir_update_frame = Frame(root)
         dir_update_frame.pack(pady=10)
 
         self.running_label = tk.Label(root, text="", font=self.custom_font, fg="red")
         self.running_label.pack(pady=2)########
-
+        
+        # Load the default directory from the text file
+        default_directory = load_default_directory()
         tk.Label(dir_update_frame, text="Set Directory to Scan:", font=self.custom_font).pack()
         self.entry_directory = tk.Entry(dir_update_frame, font=self.custom_font)
         self.entry_directory.pack()
-        self.entry_directory.insert(0, 'F:\\_Papers\\2024')
+        self.entry_directory.insert(0, default_directory if default_directory else '')
 
         update_button = tk.Button(dir_update_frame, text="Update Database", command=self.run_update_database_task, font=self.custom_font)
         update_button.pack()
