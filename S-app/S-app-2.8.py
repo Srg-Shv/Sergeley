@@ -20,6 +20,7 @@ import time
 import os
 import re
 import shutil
+import subprocess
 
 # Ensure stdout supports UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
@@ -573,6 +574,12 @@ class PDFSearchApp:
             ).pack(side="left", padx=(0, 10))
             Button(
                 frame_buttons,
+                text="Show in Folder",
+                command=lambda i=index: self.show_file_in_explorer(i),
+                font=self.custom_font
+            ).pack(side="left", padx=(0, 10))
+            Button(
+                frame_buttons,
                 text="Copy BibTeX",
                 command=lambda i=index: self.copy_bibtex(i),
                 font=self.custom_font
@@ -611,6 +618,13 @@ class PDFSearchApp:
             move_window.destroy()
 
         Button(move_window, text="Move", command=move_paper_action, font=self.custom_font).pack(pady=5)
+        
+    def show_file_in_explorer(self, index):
+        file_path = self.results.iloc[index]['Path']
+        if os.path.exists(file_path):
+            subprocess.run(['explorer', '/select,', os.path.normpath(file_path)])
+        else:
+            messagebox.showerror("File Not Found", f"The file does not exist:\n{file_path}")
   
     def show_running_message(self):
         self.running_label.config(text="Running...")
