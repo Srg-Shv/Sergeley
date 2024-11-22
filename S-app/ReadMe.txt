@@ -1,1 +1,1 @@
-New version 2.7 with upgated functionality. November 6, 2014.
+New version 2.8 with upgated functionality. November 6, 2014.
