@@ -1,147 +1,150 @@
-## **SERGELEY**
-**Description:**
+# Sergeley
 
-This Python program is a PDF management and search tool tailored for organizing a collection of scientific papers in PDF format. It allows you to:
+**Sergeley** is a Python application designed to help researchers and academics manage and organize their collection of scientific papers (PDF files). It provides a user-friendly interface to search, categorize, and maintain a database of PDFs with rich metadata.
 
-- **Scan directories** to collect and index PDF files.
-- **Extract DOI and BibTeX information** automatically from PDFs.
-- **Maintain a searchable database** of your PDF files with metadata.
-- **Search** for papers using keywords with fuzzy matching.
-- **Open PDFs** directly from the application.
-- **Copy and edit BibTeX entries** for easy citation management.
-- **Add and edit comments** for each paper.
-- **Manage duplicates** based on DOI to keep your collection clean.
-- **View recent papers** added or modified in the last 4 weeks.
-- **Tag papers** using comments and search papers by tags.
-- **External Configuration**: The default directory for scanning is specified in an external `default_directory.txt` file for easy customization.
+## Features
 
----
+- **Directory Scanning and Database Updating**:
+  - **Set Directory to Scan**: Specify the folder containing your PDF papers.
+  - **Update Database**: Scan the directory to find new, moved, or modified PDF files and update the database accordingly.
+  - **Automatic BibTeX Extraction**: Optionally extract DOI from new PDFs to fetch and store BibTeX entries.
 
-**Instructions to Use the Program:**
+- **Search Functionality**:
+  - **Fuzzy Search**: Search papers using keywords with a customizable similarity threshold (0-100).
+  - **Tag Filtering**: View and search papers based on custom tags enclosed in `{}` within the comments.
+  - **Recent Papers**:
+    - **Show Recent Papers**: Display papers added or modified in the last 4 weeks.
+    - **Show Just Added Papers**: Display papers added or modified in the last 12 hours.
 
-**Prerequisites:**
+- **Paper Management**:
+  - **Open PDF**: Open the selected PDF file directly from the application.
+  - **Move Paper**: Move a paper to a different directory and update its path in the database.
+  - **Show in Folder**: Open the file explorer to the location of the selected PDF.
 
-1. **Python 3.x**: Ensure you have Python 3 installed on your system.
+- **Metadata Editing**:
+  - **Copy BibTeX**: Copy the BibTeX entry of a paper to the clipboard.
+  - **Edit BibTeX**: Modify the BibTeX information stored for a paper.
+  - **Edit Comments**: Add or edit comments for a paper to include notes or tags.
 
-2. **Required Python Packages**: Install the following packages if not already installed:
+- **Duplicate Detection**:
+  - **Find Duplicates**: Automatically detect duplicate papers based on DOI and confirm deletion.
+
+## Getting Started
+
+### Prerequisites
+
+- **Python 3.x**
+
+### Required Python Packages
+
+- `pandas`
+- `pdf2doi`
+- `pyperclip`
+- `fuzzywuzzy`
+- `python-dateutil`
+- `tkinter` (usually included with Python)
+- `concurrent.futures` (included in Python 3)
+- `dateutil`
+- Additional standard libraries: `os`, `sys`, `re`, `shutil`, `subprocess`, `time`, `datetime`, `random`, `string`, `json`, `threading`
+
+### Installation
+
+1. **Clone the Repository**:
 
    ```bash
-   pip install pandas pdf2doi pyperclip fuzzywuzzy[speedup] python-dateutil
+   git clone https://github.com/yourusername/PDFSearchApp.git
+   cd PDFSearchApp
    ```
 
-   - **Note**: The `fuzzywuzzy[speedup]` installation includes the `python-Levenshtein` package for faster processing.
-   - **Additional Dependencies for `pdf2doi`**: `pdfminer`, `PyPDF2`, and other dependencies may be required. Install them if prompted.
+2. **Install Dependencies**:
 
-**Steps to Use the Program:**
+   ```bash
+   pip install pandas pdf2doi pyperclip fuzzywuzzy python-dateutil
+   ```
 
-1. **Save the Program:**
+3. **Place Your Existing Database (Optional)**:
 
-   - Copy the provided Python code into a file named `pdf_search_app.py`.
+   - If you have an existing `file_database.csv`, place it in the main project directory.
 
-2. **Create a `default_directory.txt` File:**
+4. **Run the Application**:
 
-   - In the same directory as your script, create a text file named `default_directory.txt`.
-   - In this file, enter the full path to the directory where your PDF files are stored (e.g., `F:\_Papers`).
-   - This file allows you to easily change the default scanning directory without modifying the script.
+   ```bash
+   python main.py
+   ```
 
-3. **Run the Program:**
+## Usage
 
-   - Open a terminal or command prompt.
-   - Navigate to the directory where you saved `pdf_search_app.py`.
-   - Run the program using the command:
+1. **Set Directory to Scan**:
 
-     ```bash
-     python pdf_search_app.py
-     ```
+   - In the application, enter the path to the directory containing your PDFs.
+   - Click **Update Database** to scan the directory and update the database.
 
-4. **Set the Directory to Scan:**
+2. **Search for Papers**:
 
-   - In the GUI window that appears, the entry field labeled **"Set Directory to Scan:"** will be pre-filled with the path from the `default_directory.txt` file.
-   - You can modify this path manually in the GUI if needed.
-   - The directory (and its subdirectories) will be scanned for PDF files.
+   - Enter keywords in the **Enter search keywords** field.
+   - Set the desired similarity threshold (default is 70).
+   - Click **Search** to display matching papers.
 
-5. **Update the Database:**
+3. **View Tags**:
 
-   - Click the **"Update Database"** button.
-   - The program will scan the specified directory for PDF files.
-   - For each new PDF found, you will be asked if you want to extract DOI information.
-     - Click **"Yes"** to extract DOI and BibTeX information using `pdf2doi`.
-     - Click **"No"** to skip extraction (you can add/edit BibTeX information later).
-   - If duplicates are detected based on DOI, you will be prompted to confirm deletion.
+   - Click **Show {Tags}** to display a list of all tags.
+   - Double-click a tag to view papers associated with it.
 
-6. **Search for Papers:**
+4. **View Recent Papers**:
 
-   - In the **"Enter search keywords:"** field, input keywords related to the papers you're searching for.
-     - Separate multiple keywords with spaces.
-   - In the **"Enter similarity threshold (0-100):"** field, input a number (default is **70**).
-     - This sets the sensitivity of the fuzzy search; higher values mean stricter matching.
-   - Click the **"Search"** button or press **Enter**.
-   - Matching results will be displayed below.
+   - **Show Recent Papers**: Displays papers added or modified in the last 4 weeks.
+   - **Show just added papers**: Displays papers added or modified in the last 12 hours.
 
-7. **Interact with Search Results:**
+5. **Manage Papers**:
 
-   - Each search result will display the paper's title, author, and year (if available).
-   - Available actions for each paper:
-     - **Open PDF**: Opens the PDF file in your default PDF viewer.
-     - **Copy BibTeX**: Copies the BibTeX entry to your clipboard for easy citation.
-     - **Edit BibTeX**: Allows you to view and edit the BibTeX information.
-     - **Edit Comments**: Add or modify comments and tags for the paper.
+   - **Open PDF**: Opens the selected PDF file.
+   - **Move Paper**: Move the paper to a new directory.
+   - **Show in Folder**: Opens the file explorer at the paper's location.
+   - **Copy BibTeX**: Copies the BibTeX entry to the clipboard.
+   - **Edit BibTeX**: Opens a window to edit the BibTeX information.
+   - **Edit Comments**: Opens a window to add or edit comments (e.g., `{tag1}`, `{tag2}`).
 
-8. **View Recent Papers:**
+6. **Update Database**:
 
-   - Click the **"Show Recent Papers"** button to display papers added or modified in the last 4 weeks.
+   - Regularly update the database after adding new papers to keep it current.
 
-9. **Tagging and Searching by Tags:**
+## File Structure
 
-   - **Adding Tags**:
-     - When editing comments for a paper, you can add tags by enclosing them in curly braces `{}`.
-     - Example: `This paper discusses deep learning methods. {machine learning} {AI}`
-   - **Viewing Tags**:
-     - Click the **"Show {Tags}"** button to see a list of all tags used.
-   - **Searching by Tag**:
-     - In the tags list, double-click a tag to display all papers associated with it.
+- **main.py**: Entry point of the application.
+- **utils.py**: Utility functions for loading directories, databases, and parsing BibTeX fields.
+- **database_utils.py**: Functions related to database validation and directory scanning.
+- **confirm_dialogs.py**: GUI functions for confirmation dialogs.
+- **pdf_search_app.py**: Contains the `PDFSearchApp` class with all GUI-related methods.
+- **file_database.csv**: CSV file storing information about your PDF files.
+- **default_directory.txt** (optional): Stores the default directory path.
 
-10. **Remove Duplicates:**
+## Notes
 
-   - The program checks for duplicate PDFs based on DOI during database updates.
-   - If
+- **Default Directory**:
 
-duplicates are found, you'll be asked whether to delete the duplicate files.
+  - The application can load a default directory from `default_directory.txt`. If this file doesn't exist, you can set the directory within the application.
 
-11. **Edit BibTeX and Comments:**
+- **Tags**:
 
-    - **Edit BibTeX**:
-      - Allows you to correct or update the BibTeX entry for accurate citations.
-    - **Edit Comments**:
-      - Use this to add personal notes or additional metadata.
-      - Include tags within `{}` to categorize papers.
+  - Tags are enclosed in curly braces `{}` within the comments section of a paper. Use tags to categorize and easily filter papers.
 
----
+- **Duplicate Detection**:
 
-**Additional Notes:**
+  - The application detects duplicates based on the DOI extracted from BibTeX entries. It prompts for confirmation before deleting any files.
 
-- **Error Handling**:
-  - If the program encounters issues (e.g., file not found), it will display error messages.
-  - Ensure that all directory paths and file names are correct.
+## Contributing
 
-- **Dependencies**:
-  - The `pdf2doi` library may require additional system dependencies for PDF parsing.
-  - If you encounter issues with DOI extraction, check the `pdf2doi` documentation.
+Contributions are welcome! Please fork the repository and submit a pull request.
 
-- **Data Storage**:
-  - The program stores information in a CSV file named `file_database.csv` in the same directory as the script.
-  - This file is updated whenever you update the database or make changes.
+## License
 
-- **Exiting the Program**:
-  - Close the GUI window to exit the application.
-  - All changes are saved automatically upon exit or when actions are performed.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- **pdf2doi**: Used for extracting DOI and metadata from PDF files.
+- **fuzzywuzzy**: Used for fuzzy string matching in search functionality.
 
 ---
 
-**Summary:**
-
-This program streamlines the management of your scientific paper collection by automating the organization and retrieval process. By extracting metadata and providing robust search capabilities, it helps you keep track of your papers, easily find relevant literature, and maintain an organized library for your research needs.
-
----
-
-**Enjoy managing your scientific papers efficiently!**
+Feel free to customize this description further to suit your repository's needs.
