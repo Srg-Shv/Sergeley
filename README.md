@@ -1,4 +1,4 @@
-# Sergeley
+# Sergeley (2.8)
 
 **Sergeley** is a Python application designed to help researchers and academics manage and organize their collection of scientific papers (PDF files). It provides a user-friendly interface to search, categorize, and maintain a database of PDFs with rich metadata.
 
