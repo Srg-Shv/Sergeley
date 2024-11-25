@@ -1,5 +1,7 @@
 # Sergeley (3.0)
 
+![Screenshot of the project](Screenshot 2024-11-25.jpg)
+
 **Sergeley** is a Python application designed to help researchers and academics manage and organize their collection of scientific papers (PDF files). It provides a user-friendly interface to search, categorize, and maintain a database of PDFs with rich metadata.
 
 ## New Features: Directory-Based Databases, DjVu files support
