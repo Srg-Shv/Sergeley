@@ -2,12 +2,12 @@
 
 **Sergeley** is a Python application designed to help researchers and academics manage and organize their collection of scientific papers (PDF files). It provides a user-friendly interface to search, categorize, and maintain a database of PDFs with rich metadata.
 
-## New Features: Directory-Based Databases, Djvu files support
+## New Features: Directory-Based Databases, DjVu files support
 
   - The application now automatically creates and manages separate databases for different directories.
   - The CSV database filename is generated based on the directory path (e.g., scanning `F:\Papers` creates `file_database_Papers.csv`).
   - Easily switch between different collections by changing the directory in the application.
-  - If you have books in **Djvu** format, they will be included into the CSV database.
+  - If you have books in **DjVu** format, they will be included into the CSV database.
 
 ## Features
 
@@ -77,7 +77,7 @@
 
 1. **Set Directory to Scan**:
 
-   - In the application, enter the path to the directory containing your PDFs and DJVUs.
+   - In the application, enter the path to the directory containing your PDFs and DjVu-s.
    - The application will create or load a database specific to that directory.
 
 2. **Update Database**:
