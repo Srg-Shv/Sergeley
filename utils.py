@@ -1,4 +1,5 @@
 import os
+import logging
 import pandas as pd
 from random import choice
 from string import ascii_lowercase
@@ -6,21 +7,29 @@ from json import loads
 from pdf2doi import pdf2doi
 import re
 
+
+
+
 def load_default_directory():
-    """
-    Load the default directory from a text file.
-    """
-    default_dir_file = 'default_directory.txt'
+    logger = logging.getLogger(__name__)
+    # Get the directory of the running Python file
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    default_dir_file = os.path.join(script_directory, 'default_directory.txt')
+
 
     # Check if the text file exists
     if os.path.exists(default_dir_file):
-        # Read the directory from the file
-        with open(default_dir_file, 'r') as file:
-            directory = file.readline().strip()
-            return directory
+        try:
+            with open(default_dir_file, 'r', encoding='utf-8') as file:
+                directory = file.readline().strip()
+                logger.debug(f"Loaded default directory: {directory}")
+                return directory
+        except Exception as e:
+            logger.error(f"Error reading default directory: {e}")
+            return ""
     else:
-        # If the file does not exist, return an empty string or some default path
-        return ""
+        logger.warning(f"Default directory file not found: {default_dir_file}")
+    return ""
 
 def generate_safe_filename_from_directory(directory):
     # Remove drive letter (e.g., 'C:\')
