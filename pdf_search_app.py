@@ -284,8 +284,11 @@ class PDFSearchApp:
             messagebox.showerror("Error", "Please enter search keywords.")
             return
 
+        # Run the search in background
+        self.run_task_in_background(self.perform_search, keywords, threshold, task_name='search')
+
+    def perform_search(self, keywords, threshold):
         self.results = self.fuzzy_search_database(self.df, keywords, threshold).copy()
-        self.display_results()
 
     def display_results(self):
         for widget in self.scrollable_frame.winfo_children():
@@ -426,8 +429,8 @@ class PDFSearchApp:
                 f"Are you sure you want to move the paper to:\n{destination_folder}?"
             )
             if confirm:
-                self.move_file(index, destination_folder)
-
+                # Run move_file in background
+                self.run_task_in_background(self.move_file, index, destination_folder, task_name='move_file')
 
     def show_file_in_explorer(self, index):
         file_path = self.results.iloc[index]['Path']
@@ -444,7 +447,8 @@ class PDFSearchApp:
         self.running_label.config(text="")
         self.root.update_idletasks()
 
-    def run_task_in_background(self, task, *args):
+    def run_task_in_background(self, task, *args, task_name=None):
+        self.background_task_name = task_name
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         future = executor.submit(task, *args)
 
@@ -466,27 +470,36 @@ class PDFSearchApp:
 
     def handle_background_task_result(self):
         if hasattr(self, 'background_task_exception'):
-            messagebox.showerror("Error", f"Failed to update database: {self.background_task_exception}")
+            messagebox.showerror("Error", f"Failed to perform task: {self.background_task_exception}")
             del self.background_task_exception
         else:
-            result = self.background_task_result
-            messages = result['messages']
-            files_requiring_confirmation = result['files_requiring_confirmation']
-            duplicates_to_confirm = result['duplicates_to_confirm']
+            if self.background_task_name == 'update_database':
+                result = self.background_task_result
+                messages = result['messages']
+                files_requiring_confirmation = result['files_requiring_confirmation']
+                duplicates_to_confirm = result['duplicates_to_confirm']
 
-            # Display messages
-            messagebox.showinfo("Database Update", "\n".join(messages))
+                # Display messages
+                messagebox.showinfo("Database Update", "\n".join(messages))
 
-            # Process files requiring extraction
-            self.process_doi_extraction_confirmations(files_requiring_confirmation)
+                # Process files requiring extraction
+                self.process_doi_extraction_confirmations(files_requiring_confirmation)
 
-            # Process duplicates to confirm deletion
-            self.process_duplicate_confirmations(duplicates_to_confirm)
+                # Process duplicates to confirm deletion
+                self.process_duplicate_confirmations(duplicates_to_confirm)
 
-            # Clean up
-            del self.background_task_result
+                # Clean up
+                del self.background_task_result
+            elif self.background_task_name == 'search':
+                self.display_results()
+            elif self.background_task_name == 'move_file':
+                # Refresh the display after moving the file
+                self.display_results()
+            # Reset background_task_name
+            self.background_task_name = None
 
     def process_duplicate_confirmations(self, duplicates_list):
+        self.show_running_message()
         for group in duplicates_list:
             # Skip the first entry and consider the rest as duplicates
             first_entry = group.iloc[0]
@@ -506,8 +519,10 @@ class PDFSearchApp:
                             messagebox.showerror("Error", f"Failed to delete file: {e}")
         # Save the updated DataFrame
         self.save_to_csv()
+        self.hide_running_message()
 
     def process_doi_extraction_confirmations(self, files):
+        self.show_running_message()
         for file_info in files:
             full_path, file_name, extension, size, modified_date = file_info
             if extension == '.pdf':
@@ -518,6 +533,7 @@ class PDFSearchApp:
                     self.df.loc[self.df['Path'] == full_path, 'BibTeX'] = bib_info
         # Save the updated DataFrame
         self.save_to_csv()
+        self.hide_running_message()
 
     def run_update_database_task(self):
         directory_to_scan = self.entry_directory.get()
@@ -527,7 +543,7 @@ class PDFSearchApp:
         # Update csv_file and DataFrame based on the new directory
         self.csv_file = generate_safe_filename_from_directory(directory_to_scan)
         self.df = load_database(self.csv_file)
-        self.run_task_in_background(self.update_database, directory_to_scan)
+        self.run_task_in_background(self.update_database, directory_to_scan, task_name='update_database')
 
     def update_database(self, directory_to_scan):
         try:
@@ -621,6 +637,7 @@ class PDFSearchApp:
             messagebox.showinfo("Information", "The file is already in the selected folder.")
             return
 
+        self.show_running_message()
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
 
@@ -638,3 +655,5 @@ class PDFSearchApp:
             messagebox.showinfo("Success", f"File moved to {destination_folder}.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to move file: {e}")
+        finally:
+            self.hide_running_message()
