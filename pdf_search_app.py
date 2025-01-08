@@ -1,33 +1,27 @@
 import os
 import tkinter as tk
-from tkinter import END, DISABLED, messagebox, Button, Toplevel, Text, Frame, Label, Canvas, Scrollbar, Listbox, filedialog
+from tkinter import END, messagebox, Button, Toplevel, Text, Frame, Label, Canvas, Scrollbar, Listbox, filedialog, Radiobutton
 from tkinter import font as tkfont
 import pandas as pd
-import threading
+#import threading
 import concurrent.futures
 import time
 import re
 import subprocess
 import shutil
-from datetime import datetime, timedelta
 from dateutil.parser import parse
 from fuzzywuzzy import fuzz
 from pyperclip import copy
 
-from utils import (
-    load_database,
-    load_default_directory,
-    parse_bibtex_field,
-    extract_doi,
-    generate_safe_filename_from_directory
-)
-from database_utils import check_database_validity, find_duplicates
-from confirm_dialogs import confirm_extraction, confirm_deletion
+from utils import load_database, load_default_directory, parse_bibtex_field, extract_doi, generate_safe_filename_from_directory, show_duplicates_dialog
+
+from database_utils import check_database_validity, update_last_used_time
+from confirm_dialogs import confirm_extraction
 
 class PDFSearchApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Sergeley_3.0")
+        self.root.title("Sergeley_3.4")
         self.root.geometry("1150x800")
 
         self.df = pd.DataFrame()
@@ -83,7 +77,7 @@ class PDFSearchApp:
 
         recent_button = tk.Button(
             button_frame,
-            text="Show Recent Papers",
+            text="Show Recently Added Papers",
             command=self.show_recent_papers,
             font=self.custom_font
         )
@@ -91,8 +85,8 @@ class PDFSearchApp:
 
         very_recent_button = tk.Button(
             button_frame,
-            text="Show just added papers",
-            command=self.show_very_recent_papers,
+            text="Show Recently Opened Papers",
+            command=self.show_recently_opened_papers,
             font=self.custom_font
         )
         very_recent_button.pack(side=tk.LEFT, padx=5)
@@ -105,7 +99,7 @@ class PDFSearchApp:
         self.entry_threshold = tk.Entry(search_frame, font=self.custom_font)
         self.entry_threshold.pack()
         if not self.entry_threshold.get():
-            self.entry_threshold.insert(0, "70")
+            self.entry_threshold.insert(0, "100")
 
         search_button = tk.Button(
             search_frame,
@@ -196,7 +190,7 @@ class PDFSearchApp:
 
     def fuzzy_search_database(self, df, keywords, threshold=70):
         keywords = [keyword.lower() for keyword in keywords]
-        columns_to_search = ['Path', 'Name', 'BibTeX', 'Comments']
+        columns_to_search = ['Path', 'Name', 'BibTeX', 'Comments', 'Last Used Time','Date Added']
 
         def match_row(row, keywords):
             row_str = ' '.join(str(row[col]) for col in columns_to_search if col in row).lower()
@@ -213,6 +207,8 @@ class PDFSearchApp:
     def open_pdf(self, file_path):
         if os.path.exists(file_path):
             os.startfile(file_path)
+            # Update 'Last Used Time'
+            update_last_used_time(self.df, file_path, self.csv_file)
         else:
             messagebox.showerror("Error", f"File not found: {file_path}")
 
@@ -291,6 +287,20 @@ class PDFSearchApp:
         self.results = self.fuzzy_search_database(self.df, keywords, threshold).copy()
 
     def display_results(self):
+        
+        # Limit the number of displayed results to 100
+        max_results = 100
+        total_results = len(self.results)
+
+        if total_results > max_results:
+            messagebox.showinfo(
+                "Results Limited",
+                f"The total number of results is {total_results}, but only the first {max_results} results are displayed."
+                                )
+
+            # Restrict the DataFrame to show only the first 100 results
+        self.results = self.results.head(max_results)
+            
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
@@ -411,7 +421,7 @@ class PDFSearchApp:
                 font=self.custom_font
             ).pack(side="left", padx=(0, 10))
 
-    from tkinter import filedialog  # Add this import at the top of your file
+    
 
     def prompt_move_paper(self, index):
         # Get the current directory of the selected paper
@@ -499,27 +509,34 @@ class PDFSearchApp:
             self.background_task_name = None
 
     def process_duplicate_confirmations(self, duplicates_list):
+        """
+        Process duplicate files and let the user choose which files to delete.
+        """
         self.show_running_message()
-        for group in duplicates_list:
-            # Skip the first entry and consider the rest as duplicates
-            first_entry = group.iloc[0]
-            duplicates = group.iloc[1:]
 
-            for idx, item in duplicates.iterrows():
-                details = f"Found duplicate:\nName: {item['Name']}\nPath: {item['Path']}"
-                response = messagebox.askyesno("Confirm Deletion", details + "\nDo you want to delete this file?")
-                if response:
-                    # Delete file
-                    if os.path.exists(item['Path']):
-                        try:
-                            os.remove(item['Path'])
-                            # Remove from DataFrame
-                            self.df = self.df.drop(idx)
-                        except OSError as e:
-                            messagebox.showerror("Error", f"Failed to delete file: {e}")
+        for group in duplicates_list:
+            # Include all duplicates in the group
+            duplicates = group  # No slicing (group.iloc[1:])
+
+            # Display the dialog and get selected files to delete
+            files_to_delete = show_duplicates_dialog(self.root, duplicates, self.custom_font)
+
+            for file_path in files_to_delete:
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        # Remove from DataFrame
+                        self.df = self.df[self.df['Path'] != file_path]
+                    except OSError as e:
+                        messagebox.showerror("Error", f"Failed to delete file: {file_path}\nError: {e}")
+
         # Save the updated DataFrame
         self.save_to_csv()
         self.hide_running_message()
+
+
+
+
 
     def process_doi_extraction_confirmations(self, files):
         self.show_running_message()
@@ -562,60 +579,67 @@ class PDFSearchApp:
             self.background_task_exception = str(e)
 
     def show_recent_papers(self):
-        today = datetime.now()
-        four_weeks_ago = today - timedelta(weeks=4)
+        """
+        Show papers added in the last week based on the 'Date Added' column.
+        """
+        today = pd.Timestamp.now()
+        one_week_ago = today - pd.Timedelta(days=2)
 
-        if 'Modified Date' in self.df.columns:
+        if 'Date Added' in self.df.columns:
             def parse_date(date_str):
                 try:
-                    return parse(date_str)
+                    return pd.to_datetime(date_str)
                 except (ValueError, TypeError):
                     return pd.NaT
 
-            self.df['Parsed Modified Date'] = self.df['Modified Date'].apply(parse_date)
+            self.df['Date Added'] = self.df['Date Added'].apply(parse_date)
 
             recent_papers = self.df[
-                self.df['Parsed Modified Date'].notna() &
-                (self.df['Parsed Modified Date'] >= four_weeks_ago)
+                self.df['Date Added'].notna() &
+                (self.df['Date Added'] >= one_week_ago)
             ]
 
-            recent_papers = recent_papers.sort_values(by='Parsed Modified Date', ascending=False)
+            recent_papers = recent_papers.sort_values(by='Date Added', ascending=False)
 
             if recent_papers.empty:
-                messagebox.showinfo("No Recent Papers", "No papers added or modified in the last 4 weeks.")
+                messagebox.showinfo("No Recent Papers", "No papers added in the last week.")
             else:
                 self.results = recent_papers.reset_index(drop=True)
                 self.display_results()
         else:
-            messagebox.showinfo("Error", "'Modified Date' column not found in the database.")
+            messagebox.showinfo("Error", "'Date Added' column not found in the database.")
 
-    def show_very_recent_papers(self):
-        today = datetime.now()
-        twelve_hours_ago = today - timedelta(hours=12)
 
-        if 'Modified Date' in self.df.columns:
+    def show_recently_opened_papers(self):
+        today = pd.Timestamp.now()
+        three_days_ago = today - pd.Timedelta(days=3)
+
+        if 'Last Used Time' in self.df.columns:
             def parse_date(date_str):
                 try:
-                    return parse(date_str)
+                    return pd.to_datetime(date_str)
                 except (ValueError, TypeError):
                     return pd.NaT
 
-            self.df['Parsed Modified Date'] = self.df['Modified Date'].apply(parse_date)
+            self.df['Parsed Last Used Time'] = self.df['Last Used Time'].apply(parse_date)
 
             recent_papers = self.df[
-                self.df['Parsed Modified Date'].notna() &
-                (self.df['Parsed Modified Date'] >= twelve_hours_ago)
+                self.df['Parsed Last Used Time'].notna() &
+                (self.df['Parsed Last Used Time'] >= three_days_ago)
             ]
 
-            recent_papers = recent_papers.sort_values(by='Parsed Modified Date', ascending=False)
+            recent_papers = recent_papers.sort_values(by='Parsed Last Used Time', ascending=False)
+            
+            self.df.drop(columns=['Parsed Last Used Time'], inplace=True) # Ensure the column is removed
 
             if recent_papers.empty:
-                messagebox.showinfo("No Just Added Papers", "No papers added or modified in the last 12 hours.")
+                messagebox.showinfo("No Recent Papers", "No papers opened in the last 3 days.")
             else:
                 self.results = recent_papers.reset_index(drop=True)
                 self.display_results()
         else:
-            messagebox.showinfo("Error", "'Modified Date' column not found in the database.")
+            messagebox.showinfo("Error", "'Last Used Time' column not found in the database.")
+
 
     def move_file(self, index, destination_folder):
         file_path = self.results.iloc[index]['Path']
