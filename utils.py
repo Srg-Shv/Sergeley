@@ -6,7 +6,8 @@ from string import ascii_lowercase
 from json import loads
 from pdf2doi import pdf2doi
 import re
-
+import tkinter as tk
+from tkinter import Toplevel, Label, Frame, Button, Radiobutton
 
 
 
@@ -22,7 +23,7 @@ def load_default_directory():
         try:
             with open(default_dir_file, 'r', encoding='utf-8') as file:
                 directory = file.readline().strip()
-                logger.debug(f"Loaded default directory: {directory}")
+                #logger.debug(f"Loaded default directory: {directory}")
                 return directory
         except Exception as e:
             logger.error(f"Error reading default directory: {e}")
@@ -45,7 +46,7 @@ def generate_safe_filename_from_directory(directory):
 def load_database(csv_file):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(script_dir, csv_file)
-    columns = ['Path', 'Name', 'Size', 'Modified Date', 'BibTeX', 'Comments']
+    columns = ['Path', 'Name', 'Size', 'Modified Date', 'BibTeX', 'Comments','Last Used Time','Date Added']
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path, encoding='utf-8', dtype={'Modified Date': str})
         df = df.loc[:, df.columns.intersection(columns)]
@@ -103,3 +104,57 @@ def parse_bibtex_field(bibtex_str, field_name):
         return match.group(1).replace('\n', ' ').strip()
     else:
         return ''
+
+
+def show_duplicates_dialog(root, duplicates, font):
+    """
+    Show a dialog with duplicate files and allow the user to choose which one to delete.
+
+    Parameters:
+        root (tk.Tk): The parent window for the dialog.
+        duplicates (DataFrame): A DataFrame containing duplicate file information.
+        font (tkFont): Font to style the labels and buttons.
+
+    Returns:
+        list: A list containing the path of the selected file to delete.
+    """
+    selected_file = []
+
+    def on_confirm():
+        if selected_var.get():
+            selected_file.append(selected_var.get())
+        dialog_window.destroy()
+
+    dialog_window = Toplevel(root)
+    dialog_window.title("Select File to Delete")
+    dialog_window.geometry("1150x200")
+
+    frame = Frame(dialog_window)
+    frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    Label(frame, text="Select the file you want to DELETE:", font=font).pack(anchor="w", pady=(0, 10))
+
+    # Create a variable to hold the selected file
+    selected_var = tk.StringVar(value="")  # No default selection
+
+    # Display all duplicates with Radiobuttons
+    for _, row in duplicates.iterrows():
+        Radiobutton(
+            frame,
+            #text=f"Name: {row['Name']} | Path: {row['Path']}",
+            text=f"Path: {row['Path']}",
+            variable=selected_var,
+            value=row['Path'],
+            anchor="w",
+            justify="left"
+        ).pack(anchor="w")
+
+    Button(
+        dialog_window, text="Confirm", command=on_confirm, font=font, width=10
+    ).pack(pady=10)
+
+    dialog_window.grab_set()
+    dialog_window.wait_window()
+
+    return selected_file
+
