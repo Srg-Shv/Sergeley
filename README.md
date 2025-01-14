@@ -66,7 +66,7 @@
 2. **Install Dependencies**:
 
    ```bash
-   pip install pandas pdf2doi pyperclip fuzzywuzzy python-dateutil
+   pip install pandas pdf2doi pyperclip fuzzywuzzy python-dateutil python-Levenshtein
    ```
 
 3. **Run the Application**:
