@@ -583,7 +583,7 @@ class PDFSearchApp:
         Show papers added in the last week based on the 'Date Added' column.
         """
         today = pd.Timestamp.now()
-        one_week_ago = today - pd.Timedelta(days=2)
+        one_week_ago = today - pd.Timedelta(days=7)
 
         if 'Date Added' in self.df.columns:
             def parse_date(date_str):
