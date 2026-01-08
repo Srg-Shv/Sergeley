@@ -12,8 +12,9 @@ import shutil
 from dateutil.parser import parse
 from fuzzywuzzy import fuzz
 from pyperclip import copy
+import webbrowser
 
-from utils import load_database, load_default_directory, parse_bibtex_field, extract_doi, generate_safe_filename_from_directory, show_duplicates_dialog
+from utils import load_database, load_default_directory, parse_bibtex_field, extract_doi, generate_safe_filename_from_directory, show_duplicates_dialog, parse_doi_from_bibtex, bibtex_to_reference_aps
 
 from database_utils import check_database_validity, update_last_used_time
 from confirm_dialogs import confirm_extraction
@@ -69,7 +70,7 @@ class PDFSearchApp:
 
         tag_button = tk.Button(
             button_frame,
-            text="Show {Tags}",
+            text="{Tags}",
             command=self.show_tags,
             font=self.custom_font
         )
@@ -77,7 +78,7 @@ class PDFSearchApp:
 
         recent_button = tk.Button(
             button_frame,
-            text="Show Recently Added Papers",
+            text="Recently Added Papers",
             command=self.show_recent_papers,
             font=self.custom_font
         )
@@ -85,7 +86,7 @@ class PDFSearchApp:
 
         very_recent_button = tk.Button(
             button_frame,
-            text="Show Recently Opened Papers",
+            text="Recently Opened Papers",
             command=self.show_recently_opened_papers,
             font=self.custom_font
         )
@@ -190,7 +191,7 @@ class PDFSearchApp:
 
     def fuzzy_search_database(self, df, keywords, threshold=70):
         keywords = [keyword.lower() for keyword in keywords]
-        columns_to_search = ['Path', 'Name', 'BibTeX', 'Comments', 'Last Used Time','Date Added']
+        columns_to_search = ['Path', 'Name', 'BibTeX', 'Comments']#, 'Last Used Time','Date Added'] 01.07.2025
 
         def match_row(row, keywords):
             row_str = ' '.join(str(row[col]) for col in columns_to_search if col in row).lower()
@@ -285,22 +286,33 @@ class PDFSearchApp:
 
     def perform_search(self, keywords, threshold):
         self.results = self.fuzzy_search_database(self.df, keywords, threshold).copy()
+        
+    def copy_reference(self, index):
+        bibtex_str = self.results.loc[index, 'BibTeX']
+        reference = bibtex_to_reference_aps(bibtex_str)
+
+        if not reference:
+            messagebox.showwarning("Copy Reference", "No reference data available.")
+            return
+
+        self.root.clipboard_clear()
+        self.root.clipboard_append(reference)
+        self.root.update()
 
     def display_results(self):
-        
-        # Limit the number of displayed results to 100
+
         max_results = 100
         total_results = len(self.results)
 
         if total_results > max_results:
             messagebox.showinfo(
                 "Results Limited",
-                f"The total number of results is {total_results}, but only the first {max_results} results are displayed."
-                                )
+                f"The total number of results is {total_results}, "
+                f"but only the first {max_results} results are displayed."
+            )
 
-            # Restrict the DataFrame to show only the first 100 results
         self.results = self.results.head(max_results)
-            
+
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
@@ -308,42 +320,36 @@ class PDFSearchApp:
             messagebox.showinfo("No Results", "No matching results found.")
             return
 
-        self.results['Year'] = self.results['BibTeX'].apply(lambda bibtex: parse_bibtex_field(bibtex, 'year'))
-
+        # Extract and sort by year
+        self.results['Year'] = self.results['BibTeX'].apply(
+            lambda bibtex: parse_bibtex_field(bibtex, 'year')
+        )
         self.results['Year'] = pd.to_numeric(self.results['Year'], errors='coerce')
-
-        self.results = self.results.sort_values(by='Year', ascending=False, na_position='last').reset_index(drop=True)
+        self.results = (
+            self.results
+            .sort_values(by='Year', ascending=False, na_position='last')
+            .reset_index(drop=True)
+        )
 
         default_bg_color = self.root.cget("bg")
 
         for index, row in self.results.iterrows():
-            bibtex_str = row['BibTeX']
-            if not isinstance(bibtex_str, str):
-                bibtex_str = ''
-            elif pd.isna(bibtex_str):
-                bibtex_str = ''
 
+            bibtex_str = row['BibTeX'] if isinstance(row['BibTeX'], str) else ''
             title = parse_bibtex_field(bibtex_str, 'title')
             author = parse_bibtex_field(bibtex_str, 'author')
-            year = row['Year']
+            year = '-' if pd.isna(row['Year']) else int(row['Year'])
 
             if not title:
                 title = f"Path: {row['Path']}"
 
-            year = '-' if pd.isna(year) else int(year)
-
+            # ===== Bibliography line =====
             frame_biblio = Frame(self.scrollable_frame, pady=5)
-            frame_biblio.pack(fill=tk.X, padx=10, pady=0, expand=True)
+            frame_biblio.pack(fill=tk.X, padx=10)
 
             bibliography_text = f"{year} - {title} - {author}"
-
-            # Calculate the total pixel width of the text
             text_width_px = self.title_font.measure(bibliography_text)
-
-            # Calculate the number of lines required
-            num_lines = (text_width_px // 1040) + 1  # Adjust based on your window width
-
-            # Ensure a minimum height of 1 line
+            num_lines = (text_width_px // 1040) + 1
             text_height = max(1, num_lines)
 
             text_biblio = Text(
@@ -356,16 +362,15 @@ class PDFSearchApp:
                 borderwidth=0,
                 width=130
             )
-
             text_biblio.insert(tk.END, bibliography_text)
             text_biblio.config(state=tk.DISABLED)
             text_biblio.pack(anchor="w", fill='x', expand=True)
 
-            # Display the path
-            frame_path = Frame(self.scrollable_frame, pady=5)
-            frame_path.pack(fill=tk.X, padx=10, pady=0, expand=True)
+            # ===== Path + DOI line =====
+            frame_path = Frame(self.scrollable_frame, pady=3)
+            frame_path.pack(fill=tk.X, padx=10)
 
-            bibliography_path = f"{row['Path']}"
+            doi = parse_doi_from_bibtex(bibtex_str)
 
             text_path = Text(
                 frame_path,
@@ -377,10 +382,29 @@ class PDFSearchApp:
                 borderwidth=0,
                 width=130
             )
-            text_path.insert(tk.END, bibliography_path)
+
+            # Insert file path
+            text_path.insert(tk.END, row['Path'])
+
+            # Insert DOI (clickable)
+            if doi:
+                text_path.insert(tk.END, "    | DOI: ")
+                start = text_path.index(tk.INSERT)
+                text_path.insert(tk.END, doi)
+                end = text_path.index(tk.INSERT)
+
+                text_path.tag_add("doi", start, end)
+                text_path.tag_config("doi", foreground="blue", underline=True)
+                text_path.tag_bind(
+                    "doi",
+                    "<Button-1>",
+                    lambda e, d=doi: webbrowser.open(f"https://doi.org/{d}")
+                )
+
             text_path.config(state=tk.DISABLED)
             text_path.pack(anchor="w", fill='x', expand=True)
 
+            # ===== Buttons =====
             frame_buttons = Frame(self.scrollable_frame)
             frame_buttons.pack(fill=tk.X, padx=10, pady=2)
 
@@ -390,36 +414,49 @@ class PDFSearchApp:
                 command=lambda p=row['Path']: self.open_pdf(p),
                 font=self.custom_font
             ).pack(side="left", padx=(0, 10))
+
             Button(
                 frame_buttons,
                 text="Move Paper",
                 command=lambda i=index: self.prompt_move_paper(i),
                 font=self.custom_font
             ).pack(side="left", padx=(0, 10))
+
             Button(
                 frame_buttons,
                 text="Show in Folder",
                 command=lambda i=index: self.show_file_in_explorer(i),
                 font=self.custom_font
             ).pack(side="left", padx=(0, 10))
+
             Button(
                 frame_buttons,
                 text="Copy BibTeX",
                 command=lambda i=index: self.copy_bibtex(i),
                 font=self.custom_font
             ).pack(side="left", padx=(0, 10))
+
             Button(
                 frame_buttons,
                 text="Edit BibTeX",
                 command=lambda i=index: self.open_bibtex_window(i),
                 font=self.custom_font
             ).pack(side="left", padx=(0, 10))
+            
+            Button(#new
+                frame_buttons,
+                text="Copy Reference",
+                command=lambda i=index: self.copy_reference(i),
+                font=self.custom_font
+            ).pack(side="left", padx=(0, 10))
+
             Button(
                 frame_buttons,
                 text="Edit Comments",
                 command=lambda i=index: self.open_comments_window(i),
                 font=self.custom_font
             ).pack(side="left", padx=(0, 10))
+
 
     
 
