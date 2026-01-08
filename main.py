@@ -1,4 +1,4 @@
-#Sergeley 3.4
+#Sergeley 3.5
 import sys
 import tkinter as tk
 
