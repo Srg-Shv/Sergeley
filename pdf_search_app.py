@@ -22,7 +22,7 @@ from confirm_dialogs import confirm_extraction
 class PDFSearchApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Sergeley_3.4")
+        self.root.title("Sergeley_3.5")
         self.root.geometry("1150x800")
 
         self.df = pd.DataFrame()
@@ -718,3 +718,4 @@ class PDFSearchApp:
             messagebox.showerror("Error", f"Failed to move file: {e}")
         finally:
             self.hide_running_message()
+
