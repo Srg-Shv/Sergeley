@@ -157,4 +157,127 @@ def show_duplicates_dialog(root, duplicates, font):
     dialog_window.wait_window()
 
     return selected_file
+def parse_doi_from_bibtex(bibtex_str):
+    """
+    Extract DOI field from a BibTeX string.
+    """
+    if not isinstance(bibtex_str, str):
+        return ''
+    doi = parse_bibtex_field(bibtex_str, 'doi')
+    if not doi:
+        doi = parse_bibtex_field(bibtex_str, 'DOI')
+    return doi.strip() if doi else ''
+    
+def format_authors_apa(author_field):
+    """
+    Convert BibTeX author field to:
+    Lastname, I.C.
+    Uses only the first author.
+    """
+    if not author_field:
+        return ""
 
+    # BibTeX authors may be separated by 'and'
+    first_author = author_field.split(' and ')[0].strip()
+
+    # Handle "Last, First Middle" or "First Middle Last"
+    if ',' in first_author:
+        last, firsts = [x.strip() for x in first_author.split(',', 1)]
+    else:
+        parts = first_author.split()
+        last = parts[-1]
+        firsts = " ".join(parts[:-1])
+
+    initials = "".join(f"{name[0]}." for name in firsts.split() if name)
+    return f"{last}, {initials}"
+    
+def format_authors_aps(author_field):
+    """
+    Convert BibTeX author field to APS style:
+    A. V. Lastname, B. C. Lastname, and D. E. Lastname
+    """
+    if not author_field:
+        return ""
+
+    authors = [a.strip() for a in author_field.split(' and ') if a.strip()]
+    formatted = []
+
+    for author in authors:
+        # Handle "Last, First Middle" format
+        if ',' in author:
+            last, firsts = [x.strip() for x in author.split(',', 1)]
+            first_parts = firsts.split()
+        else:
+            parts = author.split()
+            last = parts[-1]
+            first_parts = parts[:-1]
+
+        initials = " ".join(f"{name[0]}." for name in first_parts if name)
+        formatted.append(f"{initials} {last}")
+
+    # APS punctuation rules
+    if len(formatted) == 1:
+        return formatted[0]
+    elif len(formatted) == 2:
+        return f"{formatted[0]} and {formatted[1]}"
+    else:
+        return ", ".join(formatted[:-1]) + ", and " + formatted[-1]
+
+
+def bibtex_to_reference_aps(bibtex_str):
+    """
+    Convert BibTeX entry to APS-style reference:
+
+    A. B. Author, C. D. Author, and E. F. Author,
+    "Title of the article,"
+    Journal Abbrev. Volume(Issue), pages (Year).
+    https://doi.org/...
+
+    """
+    if not isinstance(bibtex_str, str):
+        return ""
+
+    authors = parse_bibtex_field(bibtex_str, 'author')
+    title = parse_bibtex_field(bibtex_str, 'title')
+    journal = parse_bibtex_field(bibtex_str, 'journal')
+    year = parse_bibtex_field(bibtex_str, 'year')
+    volume = parse_bibtex_field(bibtex_str, 'volume')
+    number = parse_bibtex_field(bibtex_str, 'number')
+    pages = parse_bibtex_field(bibtex_str, 'pages')
+    doi = parse_doi_from_bibtex(bibtex_str)
+
+    parts = []
+
+    # --- Authors ---
+    author_str = format_authors_aps(authors)
+    if author_str:
+        parts.append(author_str + ",")
+
+    # --- Title ---
+    if title:
+        parts.append(f"\"{title},\"")
+
+    # --- Journal, volume, issue ---
+    journal_part = journal if journal else ""
+    if volume:
+        journal_part += f" {volume}"
+    if number:
+        journal_part += f"({number})"
+
+    if journal_part:
+        journal_part += ","
+        parts.append(journal_part)
+
+    # --- Pages ---
+    if pages:
+        parts.append(f"{pages}")
+
+    # --- Year ---
+    if year:
+        parts.append(f"({year}).")
+
+    # --- DOI ---
+    if doi:
+        parts.append(f"https://doi.org/{doi}")
+
+    return " ".join(parts)
