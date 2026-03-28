@@ -4,6 +4,7 @@
 
 ![Screenshot of the project](https://github.com/Srg-Shv/Sergeley/blob/main/Screenshot.png)
 
+
 ## New Features: Directory-Based Databases, DjVu files support
 
   - The application now automatically creates and manages separate databases for different directories.
