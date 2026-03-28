@@ -14,7 +14,7 @@ from fuzzywuzzy import fuzz
 from pyperclip import copy
 import webbrowser
 
-from utils import load_database, load_default_directory, parse_bibtex_field, extract_doi, generate_safe_filename_from_directory, show_duplicates_dialog, parse_doi_from_bibtex, bibtex_to_reference_aps
+from utils import load_database, load_default_directory, parse_bibtex_field, extract_doi, generate_safe_filename_from_directory, show_duplicates_dialog, parse_doi_from_bibtex, bibtex_to_reference_aps, bibtex_to_reference_lc
 
 from database_utils import check_database_validity, update_last_used_time
 from confirm_dialogs import confirm_extraction
@@ -22,7 +22,7 @@ from confirm_dialogs import confirm_extraction
 class PDFSearchApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Sergeley_3.5")
+        self.root.title("Sergeley_3.4")
         self.root.geometry("1150x800")
 
         self.df = pd.DataFrame()
@@ -163,12 +163,17 @@ class PDFSearchApp:
         Extract tags from the 'Comments' column of the DataFrame.
         Tags are assumed to be enclosed in curly braces {tag}.
         """
-        tags = set()
-        for comments in self.df['Comments']:
-            if pd.notna(comments):
-                tags_in_comments = re.findall(r'\{(.*?)\}', comments)
-                tags.update(tags_in_comments)
-        return sorted(tags)
+        if 'Comments' not in self.df.columns:
+            return[]
+            
+        # OPTIMIZATION: Vectorized regex extraction
+        # Extracts all matches into lists, drops NaNs, and flattens the lists
+        extracted_lists = self.df['Comments'].dropna().str.findall(r'\{(.*?)\}')
+        
+        # Flatten the list of lists and get unique values
+        tags = {tag for sublist in extracted_lists for tag in sublist}
+        
+        return sorted(list(tags))
 
     def show_papers_with_tag(self, event, listbox):
         selection = listbox.curselection()
@@ -191,19 +196,31 @@ class PDFSearchApp:
 
     def fuzzy_search_database(self, df, keywords, threshold=70):
         keywords = [keyword.lower() for keyword in keywords]
-        columns_to_search = ['Path', 'Name', 'BibTeX', 'Comments']#, 'Last Used Time','Date Added'] 01.07.2025
+        combined_keywords = ' '.join(keywords)
+        columns_to_search = ['Path', 'Name', 'BibTeX', 'Comments']
+        
+        # Only use columns that actually exist in the dataframe
+        valid_cols =[col for col in columns_to_search if col in df.columns]
 
-        def match_row(row, keywords):
-            row_str = ' '.join(str(row[col]) for col in columns_to_search if col in row).lower()
-            individual_scores = [fuzz.partial_ratio(keyword, row_str) for keyword in keywords]
-            combined_keywords = ' '.join(keywords)
-            combined_score = fuzz.token_set_ratio(combined_keywords, row_str)
-            return all(score >= threshold for score in individual_scores) or combined_score >= threshold
+        # OPTIMIZATION 1: Vectorized string concatenation (Extremely fast)
+        # Fills NaNs with empty strings, converts to string, joins with space, and makes lowercase
+        combined_text = df[valid_cols].fillna('').astype(str).agg(' '.join, axis=1).str.lower()
 
-        mask = df.apply(lambda row: match_row(row, keywords), axis=1)
-        result_df = df[mask].reset_index(drop=True)
+        # OPTIMIZATION 2: Apply the fuzzy logic to the 1D Series rather than the 2D DataFrame
+        def compute_match(text):
+            # Quick exact substring check first to save CPU cycles on fuzzy math
+            if all(kw in text for kw in keywords):
+                return True
+                
+            individual_scores = [fuzz.partial_ratio(kw, text) for kw in keywords]
+            if all(score >= threshold for score in individual_scores):
+                return True
+                
+            combined_score = fuzz.token_set_ratio(combined_keywords, text)
+            return combined_score >= threshold
 
-        return result_df
+        mask = combined_text.apply(compute_match)
+        return df[mask].reset_index(drop=True)
 
     def open_pdf(self, file_path):
         if os.path.exists(file_path):
@@ -289,7 +306,7 @@ class PDFSearchApp:
         
     def copy_reference(self, index):
         bibtex_str = self.results.loc[index, 'BibTeX']
-        reference = bibtex_to_reference_aps(bibtex_str)
+        reference = bibtex_to_reference_lc(bibtex_str)
 
         if not reference:
             messagebox.showwarning("Copy Reference", "No reference data available.")
@@ -300,7 +317,23 @@ class PDFSearchApp:
         self.root.update()
 
     def display_results(self):
+        if self.results.empty:
+            # Clear existing widgets first
+            for widget in self.scrollable_frame.winfo_children():
+                widget.destroy()
+            messagebox.showinfo("No Results", "No matching results found.")
+            return
 
+        # 1. Extract and sort by year FIRST (before capping)
+        # FAST SORTING: Just use the dedicated 'Year' column!
+        self.results['Year'] = pd.to_numeric(self.results['Year'], errors='coerce')
+        self.results = (
+            self.results
+            .sort_values(by='Year', ascending=False, na_position='last')
+            .reset_index(drop=True)
+        )
+
+        # 2. NOW cap the results
         max_results = 100
         total_results = len(self.results)
 
@@ -308,13 +341,15 @@ class PDFSearchApp:
             messagebox.showinfo(
                 "Results Limited",
                 f"The total number of results is {total_results}, "
-                f"but only the first {max_results} results are displayed."
+                f"but only the top {max_results} most recent results are displayed."
             )
+            self.results = self.results.head(max_results)
 
-        self.results = self.results.head(max_results)
-
+        # 3. Clear UI
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
+            
+        # ... (rest of your display_results code remains the same)
 
         if self.results.empty:
             messagebox.showinfo("No Results", "No matching results found.")
@@ -334,14 +369,20 @@ class PDFSearchApp:
         default_bg_color = self.root.cget("bg")
 
         for index, row in self.results.iterrows():
-
-            bibtex_str = row['BibTeX'] if isinstance(row['BibTeX'], str) else ''
-            title = parse_bibtex_field(bibtex_str, 'title')
-            author = parse_bibtex_field(bibtex_str, 'author')
+            # FAST RENDERING: Read directly from the columns instead of parsing BibTeX!
+            title = row.get('Title', '')
+            author = row.get('Author', '')
             year = '-' if pd.isna(row['Year']) else int(row['Year'])
 
-            if not title:
+            # ---> ADD THESE LINES BACK: We still need it for the DOI extraction below! <---
+            bibtex_str = row.get('BibTeX', '')
+            if not isinstance(bibtex_str, str):
+                bibtex_str = ''
+
+            if not title or pd.isna(title):
                 title = f"Path: {row['Path']}"
+            if pd.isna(author):
+                author = ""
 
             # ===== Bibliography line =====
             frame_biblio = Frame(self.scrollable_frame, pady=5)
@@ -583,8 +624,13 @@ class PDFSearchApp:
                 should_extract = confirm_extraction(file_name)
                 if should_extract:
                     bib_info = extract_doi(full_path)
-                    # Update the DataFrame
+                    
+                    # Update the DataFrame with BibTeX AND the new dedicated columns
                     self.df.loc[self.df['Path'] == full_path, 'BibTeX'] = bib_info
+                    self.df.loc[self.df['Path'] == full_path, 'Title'] = parse_bibtex_field(bib_info, 'title')
+                    self.df.loc[self.df['Path'] == full_path, 'Author'] = parse_bibtex_field(bib_info, 'author')
+                    self.df.loc[self.df['Path'] == full_path, 'Year'] = parse_bibtex_field(bib_info, 'year')
+                    
         # Save the updated DataFrame
         self.save_to_csv()
         self.hide_running_message()
@@ -616,66 +662,52 @@ class PDFSearchApp:
             self.background_task_exception = str(e)
 
     def show_recent_papers(self):
-        """
-        Show papers added in the last week based on the 'Date Added' column.
-        """
+        if 'Date Added' not in self.df.columns:
+            messagebox.showinfo("Error", "'Date Added' column not found in the database.")
+            return
+
         today = pd.Timestamp.now()
         one_week_ago = today - pd.Timedelta(days=7)
 
-        if 'Date Added' in self.df.columns:
-            def parse_date(date_str):
-                try:
-                    return pd.to_datetime(date_str)
-                except (ValueError, TypeError):
-                    return pd.NaT
+        # OPTIMIZATION: Vectorized date parsing
+        parsed_dates = pd.to_datetime(self.df['Date Added'], errors='coerce')
+        
+        mask = parsed_dates.notna() & (parsed_dates >= one_week_ago)
+        recent_papers = self.df[mask].copy()
+        
+        # Sort using the parsed dates
+        recent_papers['Parsed Date'] = parsed_dates[mask]
+        recent_papers = recent_papers.sort_values(by='Parsed Date', ascending=False).drop(columns=['Parsed Date'])
 
-            self.df['Date Added'] = self.df['Date Added'].apply(parse_date)
-
-            recent_papers = self.df[
-                self.df['Date Added'].notna() &
-                (self.df['Date Added'] >= one_week_ago)
-            ]
-
-            recent_papers = recent_papers.sort_values(by='Date Added', ascending=False)
-
-            if recent_papers.empty:
-                messagebox.showinfo("No Recent Papers", "No papers added in the last week.")
-            else:
-                self.results = recent_papers.reset_index(drop=True)
-                self.display_results()
+        if recent_papers.empty:
+            messagebox.showinfo("No Recent Papers", "No papers added in the last week.")
         else:
-            messagebox.showinfo("Error", "'Date Added' column not found in the database.")
+            self.results = recent_papers.reset_index(drop=True)
+            self.display_results()
 
 
     def show_recently_opened_papers(self):
+        if 'Last Used Time' not in self.df.columns:
+            messagebox.showinfo("Error", "'Last Used Time' column not found in the database.")
+            return
+
         today = pd.Timestamp.now()
         three_days_ago = today - pd.Timedelta(days=3)
 
-        if 'Last Used Time' in self.df.columns:
-            def parse_date(date_str):
-                try:
-                    return pd.to_datetime(date_str)
-                except (ValueError, TypeError):
-                    return pd.NaT
+        # OPTIMIZATION: Vectorized date parsing
+        parsed_dates = pd.to_datetime(self.df['Last Used Time'], errors='coerce')
+        
+        mask = parsed_dates.notna() & (parsed_dates >= three_days_ago)
+        recent_papers = self.df[mask].copy()
+        
+        recent_papers['Parsed Last Used Time'] = parsed_dates[mask]
+        recent_papers = recent_papers.sort_values(by='Parsed Last Used Time', ascending=False).drop(columns=['Parsed Last Used Time'])
 
-            self.df['Parsed Last Used Time'] = self.df['Last Used Time'].apply(parse_date)
-
-            recent_papers = self.df[
-                self.df['Parsed Last Used Time'].notna() &
-                (self.df['Parsed Last Used Time'] >= three_days_ago)
-            ]
-
-            recent_papers = recent_papers.sort_values(by='Parsed Last Used Time', ascending=False)
-            
-            self.df.drop(columns=['Parsed Last Used Time'], inplace=True) # Ensure the column is removed
-
-            if recent_papers.empty:
-                messagebox.showinfo("No Recent Papers", "No papers opened in the last 3 days.")
-            else:
-                self.results = recent_papers.reset_index(drop=True)
-                self.display_results()
+        if recent_papers.empty:
+            messagebox.showinfo("No Recent Papers", "No papers opened in the last 3 days.")
         else:
-            messagebox.showinfo("Error", "'Last Used Time' column not found in the database.")
+            self.results = recent_papers.reset_index(drop=True)
+            self.display_results()
 
 
     def move_file(self, index, destination_folder):
@@ -718,4 +750,3 @@ class PDFSearchApp:
             messagebox.showerror("Error", f"Failed to move file: {e}")
         finally:
             self.hide_running_message()
-
