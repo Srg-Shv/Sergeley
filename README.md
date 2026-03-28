@@ -106,7 +106,7 @@
 - **confirm_dialogs.py**: GUI functions for confirmation dialogs.
 - **pdf_search_app.py**: Contains the `PDFSearchApp` class with all GUI-related methods.
 - **file_database_<sanitized_directory_path>.csv**: CSV files storing information about your PDF files for each directory.
-- **default_directory.txt** (optional): Stores the default directory path.
+- **default_directory.txt** **(optional, but useful): Stores the default directory path.**
 
 ## Notes
 
