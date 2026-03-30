@@ -16,13 +16,13 @@ import webbrowser
 
 from utils import load_database, load_default_directory, parse_bibtex_field, extract_doi, generate_safe_filename_from_directory, show_duplicates_dialog, parse_doi_from_bibtex, bibtex_to_reference_aps, bibtex_to_reference_lc
 
-from database_utils import check_database_validity, update_last_used_time
+from database_utils import check_database_validity, update_last_used_time, find_duplicates
 from confirm_dialogs import confirm_extraction
 
 class PDFSearchApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Sergeley_3.4")
+        self.root.title("Sergeley_3.5")
         self.root.geometry("1150x800")
 
         self.df = pd.DataFrame()
@@ -570,19 +570,35 @@ class PDFSearchApp:
                 # Display messages
                 messagebox.showinfo("Database Update", "\n".join(messages))
 
-                # Process files requiring extraction
-                self.process_doi_extraction_confirmations(files_requiring_confirmation)
+                # --- STAGE 1: Process Name & Size duplicates FIRST ---
+                if duplicates_to_confirm:
+                    self.process_duplicate_confirmations(duplicates_to_confirm)
 
-                # Process duplicates to confirm deletion
-                self.process_duplicate_confirmations(duplicates_to_confirm)
+                # --- STAGE 2: Filter out files the user just deleted ---
+                valid_files_for_extraction =[]
+                for file_info in files_requiring_confirmation:
+                    full_path = file_info[0]
+                    if os.path.exists(full_path):  # Only extract if it wasn't deleted!
+                        valid_files_for_extraction.append(file_info)
+
+                # Process DOI extraction for the survivors
+                if valid_files_for_extraction:
+                    self.process_doi_extraction_confirmations(valid_files_for_extraction)
+
+                # --- STAGE 3: Deep DOI Duplicate Check ---
+                # Now that new DOIs are extracted, check one last time
+                final_duplicates = find_duplicates(self.df)
+                if final_duplicates:
+                    self.process_duplicate_confirmations(final_duplicates)
 
                 # Clean up
                 del self.background_task_result
+                
             elif self.background_task_name == 'search':
                 self.display_results()
             elif self.background_task_name == 'move_file':
-                # Refresh the display after moving the file
                 self.display_results()
+                
             # Reset background_task_name
             self.background_task_name = None
 
