@@ -146,27 +146,38 @@ def check_database_validity(directory, csv_file):
 
 def find_duplicates(df):
     """
-    Finds duplicates using vectorized regex extraction. 
-    100x faster than applying a custom function row-by-row.
+    Finds duplicates based on Name, Size, and DOI.
     """
-    # OPTIMIZATION: Vectorized C-engine regex extraction
-    extracted_dois = df['BibTeX'].str.extract(r'doi\s*=\s*\{([^}]+)\}', flags=re.IGNORECASE)[0]
-    
-    # Clean up whitespace
-    extracted_dois = extracted_dois.str.strip()
+    duplicate_groups =[]
+    processed_paths = set()
 
-    # Filter out empty DOIs
-    valid_dois_mask = extracted_dois.notna() & (extracted_dois != '')
-    df_with_dois = df[valid_dois_mask].copy()
-    df_with_dois['DOI_extracted'] = extracted_dois[valid_dois_mask]
+    def add_groups(grouped):
+        for _, group in grouped:
+            # Filter out files we already flagged in a previous check
+            group = group[~group['Path'].isin(processed_paths)]
+            if len(group) > 1:
+                duplicate_groups.append(group)
+                processed_paths.update(group['Path'].tolist())
 
-    # Identify duplicates
-    duplicates = df_with_dois[df_with_dois.duplicated(subset='DOI_extracted', keep=False)]
+    # 1. Exact File Name Match (Fastest)
+    add_groups(df[df.duplicated(subset='Name', keep=False)].groupby('Name'))
 
-    # Group duplicates by DOI
-    grouped_duplicates = [group.drop(columns=['DOI_extracted']) for _, group in duplicates.groupby('DOI_extracted')]
+    # 2. Exact File Size Match (Ignore files < 1KB to prevent false positives)
+    df_size = df[df['Size'] > 1000]
+    add_groups(df_size[df_size.duplicated(subset='Size', keep=False)].groupby('Size'))
 
-    return grouped_duplicates
+    # 3. Exact DOI Match (Deepest)
+    # Safely extract DOIs, ignoring empty or missing BibTeX entries
+    if 'BibTeX' in df.columns:
+        extracted_dois = df['BibTeX'].astype(str).str.extract(r'doi\s*=\s*\{([^}]+)\}', flags=re.IGNORECASE)[0].str.strip()
+        valid_dois = extracted_dois.notna() & (extracted_dois != '')
+        
+        df_dois = df[valid_dois].copy()
+        df_dois['DOI_extracted'] = extracted_dois[valid_dois]
+        
+        add_groups(df_dois[df_dois.duplicated(subset='DOI_extracted', keep=False)].groupby('DOI_extracted'))
+
+    return duplicate_groups
 
 
 def update_last_used_time(df, file_path, csv_file):
